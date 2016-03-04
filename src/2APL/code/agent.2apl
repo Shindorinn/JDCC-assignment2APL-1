@@ -1,0 +1,108 @@
+beliefs:
+%	knowobstacle :- obstacle(X , Y).
+  	knowwall :- wall( X, Y ).
+	agentlocation :- agent( ID, X, Y ).
+	
+beliefupdates:
+  	{ not wall(X,Y) } FoundWall(X, Y) { wall(X, Y) }
+	{ agent(I, _ , _ ) } FoundAgent(ID, X, Y) { not agent(I, _ , _) , agent(ID, X, Y) }	
+	
+pcrules:
+	senseObstacles() <- true |
+	{
+		@blockworld( senseAllAgent(), AGENTS );
+		if B( AGENTS = [[default,ID,X1,Y1]|REST] ) then
+		{
+			FoundAgent(ID, X1, Y1);
+		}	
+		@blockworld( senseStones(), STONES );
+		if B( STONES = [[default,X1,Y1]|REST] ) then
+		{
+			FoundWall(X1, Y1);
+		}	
+	}
+
+	moveto( X, Y ) <- true | 
+	{
+		@blockworld( sensePosition(), POS );
+    	B(POS = [A,B]);
+    	
+    	senseObstacles();
+    	if ( (A > X) && B(not agent( X-1, Y)) && B(not wall( X-1, Y)) ) then
+	    { 
+			@blockworld( west(), _ );
+	    	moveto( X, Y );
+	    }
+	    else if ( (A < X ) && B(not agent( X+1, Y)) && B(not wall( X+1, Y)) ) then
+	    { 
+			@blockworld( east(), _ );
+	    	moveto( X, Y );
+	    }
+	    else if ( (B > Y ) && B(not agent( X, Y-1)) && B(not wall( X, Y-1)) ) then
+	    { 
+			@blockworld( north(), _ );
+	    	moveto( X, Y );
+	    }
+	    else if ( (B < Y) && B(not agent( X, Y+1)) && B(not wall( X, Y+1)) ) then
+	    { 
+			@blockworld( south(), _ );
+	    	moveto( X, Y );
+	    }
+    
+	}
+
+
+  goto( X, Y ) <- true |
+  {
+    @blockworld( sensePosition(), POS );
+    B(POS = [A,B]);
+    if (A > X) then
+    { 
+		  @blockworld( west(), _ );
+      goto( X, Y );
+    }
+    else if (A < X) then
+    { 
+		  @blockworld( east(), _ );
+      goto( X, Y );
+    }
+    else if (B > Y) then
+    { 
+		  @blockworld( north(), _ );
+      goto( X, Y );
+    }
+    else if (B < Y) then
+    { 
+		  @blockworld( south(), _ );
+      goto( X, Y );
+    }
+  }
+  
+	startup(X,Y,C) <- true |
+	  {
+	    @blockworld( enter(X, Y, C), _);
+			
+	    @blockworld( getWorldSize(), WS);
+	    B(WS = [Width,Height]);
+			+worldSize(Width, Height);
+			
+	    @blockworld( getSenseRange(), SR );
+			B(SR = [S]);		
+	    +senseRange(S);
+	  }
+  
+prrules:
+	@blockworld( north(), _); REST; <- true | {
+		@blockworld (east(), _); REST;
+	}
+	@blockworld( east(), _); REST; <- true | {
+		@blockworld (south(), _); REST;
+	}
+	@blockworld( south(), _); REST; <- true | {
+		@blockworld (west(), _); REST;
+	}
+	@blockworld( west(), _); REST; <- true | {
+		@blockworld( north(), _) ; REST;
+	}
+
+  

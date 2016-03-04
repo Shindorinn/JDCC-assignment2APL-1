@@ -1,1 +1,68 @@
 include: agent.2apl;
+
+beliefs:
+  knowtrap :- trap(X, Y).
+  clean( blockWorld ) :- not bomb(X,Y) , not carry(bomb).
+  canClean(X, Y, A, B) :- bomb( X, Y ), trap(A, B). 
+  bombsdropped(0).	
+
+beliefupdates:
+  { not trap(X,Y) } FoundTrap(X, Y) { trap(X, Y) }
+  { trap(A,B) } FoundNewTrap(X,Y) { not trap(A,B), trap(X,Y)}
+  { carry(bomb), bombsdropped(N) }     Drop()   { not carry(bomb), not bombsdropped(N), bombsdropped(N+1) }
+  { not carry(bomb) } PickUp() { carry(bomb) }
+
+plans:
+  startup(0, 1, blue);
+
+goals:
+  knowtrap,
+  clean( blockWorld ).
+
+pgrules:
+  clean( blockWorld ) <- canClean(X, Y, A, B) |
+  {
+    moveto( X, Y );
+    @blockworld( pickup( ), _ );
+		PickUp();
+		-bomb( X, Y );
+		@blockworld( senseTraps(), TRAPS );
+	    if B( TRAPS = [[default,X1,Y1]|REST] )
+	    { 
+	      FoundNewTrap(X1, Y1);
+	    }
+    moveto(A, B);
+		@blockworld( drop( ), _ );
+		Drop();
+  }
+  knowtrap <- worldSize(W,H) |
+  {
+    B(is( X, int( random( W - 1 ) ) ));
+    B(is( Y, int( random( H - 1 ) ) ));
+    moveto( X, Y );
+    @blockworld( senseTraps(), TRAPS );
+    if B( TRAPS = [[default,X1,Y1]|REST] )
+    { 
+      FoundTrap(X1, Y1);
+    }
+  }
+
+pcrules:
+  message( sally, inform, La, On, bombAt( X, Y ) ) <- true |
+  {   
+    if B( not bomb( A, B ) ) {
+      +bomb(X, Y);
+      adoptz( clean( blockWorld ) );
+    }
+    else { 
+			+bomb( X, Y );
+		}
+  }
+
+prrules:
+  @blockworld( pickup(), _ ); REST; <- true |
+  {
+    @blockworld( sensePosition(), POS );
+    B(POS = [X,Y]);
+    -bomb(X, Y );
+  }
