@@ -15,6 +15,6 @@ pgrules:
     @blockworld( senseBombs(), BOMBS );
     if B( BOMBS = [[default,X1,Y1]|REST] )
     { 
-      send( harry, inform, bombAt( X1, Y1 ) );
+      send( barry, inform, bombAt( X1, Y1 ) );
     }
   }

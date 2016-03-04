@@ -48,7 +48,7 @@ pgrules:
   }
 
 pcrules:
-  message( sally, inform, La, On, bombAt( X, Y ) ) <- true |
+  message( hally, inform, La, On, bombAt( X, Y ) ) <- true |
   {   
     if B( not bomb( A, B ) ) {
       +bomb(X, Y);
