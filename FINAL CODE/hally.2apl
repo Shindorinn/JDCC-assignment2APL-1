@@ -1,0 +1,460 @@
+include: agent.2apl;
+
+beliefs:
+	bombRequestsSent(0).
+	availableAgents(0).
+	agentsResponded(0).
+	restBombs(0).
+	
+beliefupdates:
+  { availableAgents(N) }	AdjustAvailableAgents()		{ not availableAgents(N), availableAgents(N+1) }
+  { agentsResponded(C) }	AdjustAgentsResponded()		{ not agentsResponded(C), agentsResponded(C+1) }
+  { bombRequestsSent(N) }   AdjustBombRequestsSent()	{ not bombRequestsSent(N), bombRequestsSent(N+1) }
+  { availableAgents(N) }	InitAvailableAgents()		{ not availableAgents(N), availableAgents(0) }
+  { agentsResponded(S) }	InitAgentsResponded()		{ not agentsResponded(S), agentsResponded(0) }
+  { bombRequestsSent(N) }   InitBombRequestsSent()		{ not bombRequestsSent(N), bombRequestsSent(0) }
+ 
+goals:
+  search( blockWorld ).
+
+plans:
+  startup(8, 8, red);
+
+pgrules:
+  search( blockWorld ) <- worldSize(W,H) and bombRequestsSent(N) |
+  {   
+  	% Hally will wait for all agents to respond, if messages were sent	
+  	if(N < 1)
+  	{
+	    B(is( X, int( random( W - 1 ) ) ));
+	    B(is( Y, int( random( H - 1 ) ) ));
+	    
+	    @blockworld( senseAllStones(), STONES);
+   		checkIfGoalIsOnStone(X,Y,STONES);
+   	
+   		if (B(not goalOnStone))
+   		{
+	   		goto( X, Y );
+   		}
+   		else
+   		{
+	   		-goalOnStone;
+	   	}
+   	
+	    @blockworld( senseBombs(), BOMBS );
+    	sendBombMsg(BOMBS);
+    }
+  }
+  
+  pcrules:
+  goto( X, Y ) <- true |
+  {
+    @blockworld( sensePosition(), POS );
+    B(POS = [A,B]);
+    
+    @blockworld( senseAgent(), AGENTS );
+    @blockworld( senseStones(), STONES );
+    
+    % for every step, check if the next step has an obstacle
+    if (A > X) then
+    { 
+    	checkNextStepForStone(A-1,B,STONES);
+    	checkNextStepForAgent(A-1,B,AGENTS);
+    	if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		
+    		@blockworld( west(), _ );
+    	}
+    	else if (B(blockedByAgent))
+    	{
+    		-blockedByAgent;
+    		
+    		@blockworld( north(), _ );
+    		@blockworld( west(), _ );
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		hugStone(STONES, 1, A, B, 4);
+    	}
+    	goto( X, Y );
+    }
+    else if (A < X) then
+    { 
+	  	checkNextStepForStone(A+1,B,STONES);
+	  	checkNextStepForAgent(A+1,B,AGENTS);
+    	if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		
+    		@blockworld( east(), _ );
+    	}
+    	else if (B(blockedByAgent))
+    	{
+    		-blockedByAgent;
+    		
+    		@blockworld( south(), _ );
+    		@blockworld( east(), _ );
+    	}
+    	else
+    	{	
+    		-blockedByStone;
+    		hugStone(STONES, 3, A, B, 2);
+    	}
+    	goto( X, Y );
+    }
+    else if (B > Y) then
+    { 
+	 	checkNextStepForStone(A,B-1,STONES);
+	 	checkNextStepForAgent(A,B-1,AGENTS);
+    	if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		
+    		@blockworld( north(), _ );
+    	}
+    	else if (B(blockedByAgent))
+    	{
+    		-blockedByAgent;
+    		
+    		@blockworld( east(), _ );
+    		@blockworld( north(), _ );
+    	}
+    	else
+    	{	
+    		-blockedByStone;
+    		hugStone(STONES, 2, A, B, 1);
+    	}
+    	goto( X, Y );
+    }
+    else if (B < Y) then
+    { 
+		checkNextStepForStone(A,B+1,STONES);
+		checkNextStepForAgent(A,B+1,AGENTS);
+    	if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		
+    		@blockworld( south(), _ );
+    	}
+    	else if (B(blockedByAgent))
+    	{
+    		-blockedByAgent;
+    		
+    		@blockworld( west(), _ );
+    		@blockworld( south(), _ );
+    	}
+    	else
+    	{	
+    		-blockedByStone;
+    		hugStone(STONES, 4, A, B, 3);
+    	}
+    	goto( X, Y );
+    }
+  }
+  
+  % function that checks for a stone at a specific position
+  checkNextStepForStone(X,Y,STONES) <- true |
+  {	
+  	if B( STONES = [[default,XSTONE,YSTONE]|REST] )
+    { 	
+    	if(X=XSTONE and Y=YSTONE)
+    	{    			
+    		+blockedByStone;
+    	}
+    	
+      	checkNextStepForStone(X,Y,REST);
+    }
+  }
+  
+  % function that checks for an agent at a specific position
+  checkNextStepForAgent(X,Y,AGENTS) <- true |
+  {	
+  	if B( AGENTS = [[A1,XAGENTS,YAGENTS]|REST] )
+    { 	
+    	if(X=XAGENTS and Y=YAGENTS)
+    	{    			
+    		+blockedByAgent;
+    	}
+    	
+      	checkNextStepForAgent(X,Y,REST);
+    }
+  }
+  
+  checkIfGoalIsOnStone(X,Y,STONES) <- true |
+  {	
+  	if B( STONES = [[default,XSTONE,YSTONE]|REST] )
+    { 	
+    	if(X=XSTONE and Y=YSTONE)
+    	{    			
+    		+goalOnStone;
+    	}
+    	
+      	checkIfGoalIsOnStone(X,Y,REST);
+    }
+  }
+  
+  % function that handles the alternative path an agent should take to avoid obstacles, and still reach its target.
+  % Agent will always have a preference in what direction to turn to, if its way it's blocked
+  % The agent will always try to move to those direction if available. If not, it will try the next one.
+  % This will go on, until the agent is eventually back on its track. This mimics the behavior of sticking on to, and following a wall.
+  hugStone(STONES, DIRECTION, A, B, ORIGINAL) <- true |
+  {
+  	if (DIRECTION = 1)
+  	{
+  		checkNextStepForStone(A,B-1,STONES);
+  		if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		@blockworld( north(), _ );
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+      			hugStone(STONES, 4, A, B-1, ORIGINAL);
+      		}
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		if(not DIRECTION = ORIGINAL)
+    		{
+    			hugStone(STONES, 2, A, B, ORIGINAL);
+    		}
+    	}
+  	}
+  	else if (DIRECTION = 2)
+  	{
+  		checkNextStepForStone(A+1,B,STONES);
+  		if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		@blockworld( east(), _ );
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+      			hugStone(STONES, 1, A+1, B, ORIGINAL); 
+      		}
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+    			hugStone(STONES, 3, A, B, ORIGINAL);
+    		}
+    	}
+    	
+  	}
+  	else if (DIRECTION = 3)
+  	{
+  		checkNextStepForStone(A,B+1,STONES);
+  		if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		@blockworld( south(), _ );
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+      			hugStone(STONES, 2, A, B+1, ORIGINAL);
+      		}
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+    			hugStone(STONES, 4, A, B, ORIGINAL);
+    		}
+    	}
+  	}
+  	else 
+  	{
+  		checkNextStepForStone(A-1,B,STONES);
+  		if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		@blockworld( west(), _ );
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+      			hugStone(STONES, 3, A-1, B, ORIGINAL);
+      		}
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+    			hugStone(STONES, 1, A, B, ORIGINAL);
+    		}
+    	}
+  	}
+  }
+  
+  % send message to an agent to go pick up a bomb
+  sendBombMsg(BOMBS) <- true |
+  {
+  	if B( BOMBS = [[default,X1,Y1]|REST] )
+    { 	
+    	if B(not sentBomb(X1,Y1))
+    	{
+    		@blockworld( senseAllAgent(), AGENTS );
+    		requestAvailableAgents(AGENTS, X1, Y1);
+      	}
+      	
+      	B(restBombs(OLDBOMBS));
+      	-restBombs(OLDBOMBS);
+      	+restBombs(REST);
+    }
+  }
+  
+  % function that will send a request availability message to other agents. It keeps track of how many requests were sent
+  requestAvailableAgents(AGENTS, XBOMB, YBOMB) <- true |
+  {
+  	if B( AGENTS = [[A1,X1,Y1]|REST] )
+    { 	
+      	send( A1, request, isAvailable(XBOMB, YBOMB));
+      	B(bombRequestsSent(N));
+      	-bombRequestsSent(N);
+      	+bombRequestsSent(N+1);
+
+      	requestAvailableAgents(REST, XBOMB, YBOMB);
+    }
+  }
+  
+  % get message to know that a certain bomb (that was already detected) was picked up.
+  message( NAME, inform, La, On, pickedUpBomb(X, Y) ) <- true |
+  {   
+	-sentBomb(X, Y);
+  }
+  
+  % get message that agent A is available and can go pick up a bomb. It keeps track of all the available agents, and all the replies
+  % When all agents have replied, Hally will find the closest available agent to the bomb and tell that agent to go pick it up.
+  % If no one is available, hally will again find the closest agent to that bomb, and tell that agent to go pick it up
+  message( A, inform, La, On, isAvailable(K,X,Y,XBOMB,YBOMB) ) <- true |
+  {  
+  	B(availableAgents(N));
+  	
+  	if(K > 0)    %1
+  	{
+  		AdjustAvailableAgents();
+  		+availableAgent(A, X, Y, N+1);
+  	}
+  	AdjustAgentsResponded();
+	
+	B(bombRequestsSent(N2));
+	B(availableAgents(N3));
+  	B(agentsResponded(N4));
+  	
+	if (N4 > N2 - 1 and N2 > 0)	%N2 = N4
+	{
+		if (N3 > 0)
+		{
+			findClosestAgent(1, N3, XBOMB, YBOMB);
+			
+			B(closestAgent(NAME, X3, Y3));
+			-closestAgent(NAME, X3, Y3);
+			
+      		send( NAME, inform, bombAt( XBOMB, YBOMB ) );
+      		+sentBomb(XBOMB,YBOMB);
+		}
+		else
+		{    		
+			@blockworld( senseAllAgent(), AGENTS );
+
+			findClosestAgentUnavailable(1, XBOMB, YBOMB, AGENTS);
+			
+			B(closestAgent2(NAME5, X5, Y5));
+			-closestAgent2(NAME5, X5, Y5);
+			
+			send( NAME5, inform, bombAt( XBOMB, YBOMB ) );
+      		+sentBomb(XBOMB,YBOMB);
+		}
+		
+		InitAvailableAgents();	
+  		InitAgentsResponded();		
+  		InitBombRequestsSent();
+		
+		B(restBombs(RESTBOMBS));
+		sendBombMsg(RESTBOMBS);
+	}
+  }
+  
+  % function that will find the closest agent when everyone is unavailable
+  findClosestAgentUnavailable(I, XBOMB, YBOMB, AGENTS) <- true |
+  {
+  	if B( AGENTS = [[A,X,Y]|REST] )
+  	{
+  	  	if (I < 2)   %instead of I=1
+  		{
+  			+closestAgent2(A, X, Y);
+  		} 
+  		else 
+  		{
+  			B(closestAgent2(NAME1, K, L));
+  			
+  			+disC((K - XBOMB) * (K - XBOMB) + (L - YBOMB) * (L - YBOMB));
+  			+disT((X - XBOMB) * (X - XBOMB) + (Y - YBOMB) * (Y - YBOMB));
+  			
+  			B(disC(D1));
+  			B(disT(D2));
+  			
+  			-disC(D1);
+  			-disT(D2);
+  			
+  			if (D2 < D1)
+  			{
+  				-closestAgent2(NAME1, K, L);
+  				
+  				+closestAgent2(A, X, Y);
+  			}
+  		}
+  		
+  		findClosestAgentUnavailable(I+1, XBOMB, YBOMB, REST);
+  	}
+  }
+  
+  % function that will find the closest available agent
+  findClosestAgent(I, N, XBOMB, YBOMB) <- true |
+  {
+  	if(I > N)
+  	{
+  		+finished;
+  	}
+  	else
+  	{
+  		B(availableAgent(M,X,Y,I));
+  		-availableAgent(M,X,Y,I);
+  	
+  		if (I < 2)   %instead of I=1
+  		{
+  			+closestAgent(M, X, Y);
+  		} 
+  		else 
+  		{
+  			B(closestAgent(NAME1, K,L));
+  			
+  			+disC((K - XBOMB) * (K - XBOMB) + (L - YBOMB) * (L - YBOMB));
+  			+disT((X - XBOMB) * (X - XBOMB) + (Y - YBOMB) * (Y - YBOMB));
+  			
+  			B(disC(D1));
+  			B(disT(D2));
+  			
+  			-disC(D1);
+  			-disT(D2);
+  			
+  			if (D2 < D1)
+  			{
+  				-closestAgent(NAME1, K, L);
+  				
+  				+closestAgent(M, X, Y);
+  			}
+  		}
+  		
+  		findClosestAgent(I+1, N, XBOMB, YBOMB);
+  	}
+  }

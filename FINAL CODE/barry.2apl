@@ -1,0 +1,512 @@
+include: agent.2apl;
+
+beliefs:
+  knowtrap :- trap(X,Y,Z).
+  clean( blockWorld ) :- not bomb(X,Y) , not carry(bomb).
+  score(0).
+  totalTraps(0).
+
+beliefupdates:
+  { carry(bomb), score(N) }     Drop()   { not carry(bomb), not score(N), score(N+1) }
+  { not carry(bomb) } PickUp() { carry(bomb) }
+
+plans: 
+  startup(0, 1, blue);
+
+goals:
+  knowtrap.
+  clean( blockWorld ).
+
+pgrules:
+  clean( blockWorld ) <- worldSize( W, H ) and bomb( X, Y ) and trap( X1, Y1, Z1 ) and totalTraps(N) |
+  {
+    goto( X, Y );                             %move to the selected bomb
+    
+    @blockworld( senseTraps(), TRAPS );       %after arriving, sense for traps
+    if B( TRAPS = [[default,X2,Y2]|REST] )   
+    { 
+    	if B(not trap(X2, Y2, R))
+    	{
+	    	-totalTraps(N);
+	    	+totalTraps(N+1);
+	    	% add found traps to beliefs, with its cordinates and its ID
+	      	+trap(X2,Y2, N+1);    
+    	}
+    }
+    
+    @blockworld( pickup( ), _ );             %pick up bomb
+		PickUp();
+		send( hally, inform, pickedUpBomb( X, Y ) );
+		-bomb( X, Y );
+		
+	B(totalTraps(F));
+	findClosestTrap(1, F); 	
+	
+	B(closestTrap(X3, Y3));
+	-closestTrap(X3, Y3);
+	goto(X3, Y3);
+	@blockworld( drop( ), _ );
+
+	
+	@blockworld( sensePosition(), POS );
+    B(POS = [A,B]);
+    
+    goto(A, B+2);
+    
+    Drop();	
+  }
+
+  % function to try to find a trap first
+  knowtrap <- worldSize(W,H) and totalTraps(N) |
+  {
+    B(is( X, int( random( W - 1 ) ) ));
+    B(is( Y, int( random( H - 1 ) ) ));
+   	
+   	@blockworld( senseAllStones(), STONES);
+   	checkIfGoalIsOnStone(X,Y,STONES);
+   	
+   	% check if random goal position is the same as an already placed obstacle.
+   	if (B(not goalOnStone))
+   	{
+   		goto( X, Y );
+
+    	@blockworld( senseTraps(), TRAPS );
+    	if B( TRAPS = [[default,X1,Y1]|REST] )
+    	{ 
+	      	-totalTraps(N);
+    		+totalTraps(N+1);
+      		+trap(X1,Y1, N+1); 
+    	}
+   	}
+   	else
+   	{
+   		-goalOnStone;
+   	}
+    
+  }
+
+pcrules:
+  goto( X, Y ) <- true |
+  {
+    @blockworld( sensePosition(), POS );
+    B(POS = [A,B]);
+    
+    @blockworld( senseAgent(), AGENTS );
+    @blockworld( senseStones(), STONES );
+    
+    % for every step, check if the next step has an obstacle
+    if (A > X) then
+    { 
+    	checkNextStepForStone(A-1,B,STONES);
+    	checkNextStepForAgent(A-1,B,AGENTS);
+    	if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		
+    		@blockworld( west(), _ );
+    		
+	    	@blockworld( senseTraps(), TRAPS );
+	    	if B( TRAPS = [[default,X1,Y1]|REST] )
+	    	{
+	        	if B(not trap(X1, Y1, R))
+    			{
+		    	 	B(totalTraps(N));
+			      	-totalTraps(N);
+		    		+totalTraps(N+1);
+		      		+trap(X1,Y1, N+1);
+		      	} 
+	    	}
+    	}
+    	else if (B(blockedByAgent))
+    	{
+    		-blockedByAgent;
+    		
+    		@blockworld( north(), _ );
+    		@blockworld( west(), _ );
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		hugStone(STONES, 1, A, B, 4);
+    	}
+    	goto( X, Y );
+    }
+    else if (A < X) then
+    { 
+	  	checkNextStepForStone(A+1,B,STONES);
+	  	checkNextStepForAgent(A+1,B,AGENTS);
+    	if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		
+    		@blockworld( east(), _ );
+    		
+	    	@blockworld( senseTraps(), TRAPS );
+	    	if B( TRAPS = [[default,X1,Y1]|REST] )
+	    	{
+	        	if B(not trap(X1, Y1, R))
+    			{
+		    	 	B(totalTraps(N));
+			      	-totalTraps(N);
+		    		+totalTraps(N+1);
+		      		+trap(X1,Y1, N+1);
+		      	} 
+	    	}
+    	}
+    	else if (B(blockedByAgent))
+    	{
+    		-blockedByAgent;
+    		
+    		@blockworld( south(), _ );
+    		@blockworld( east(), _ );
+    	}
+    	else
+    	{	
+    		-blockedByStone;
+    		hugStone(STONES, 3, A, B, 2);
+    	}
+    	goto( X, Y );
+    }
+    else if (B > Y) then
+    { 
+	 	checkNextStepForStone(A,B-1,STONES);
+	 	checkNextStepForAgent(A,B-1,AGENTS);
+    	if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		
+    		@blockworld( north(), _ );
+    		
+	    	@blockworld( senseTraps(), TRAPS );
+	    	if B( TRAPS = [[default,X1,Y1]|REST] )
+	    	{
+	        	if B(not trap(X1, Y1, R))
+    			{
+		    	 	B(totalTraps(N));
+			      	-totalTraps(N);
+		    		+totalTraps(N+1);
+		      		+trap(X1,Y1, N+1);
+		      	} 
+	    	}
+    	}
+    	else if (B(blockedByAgent))
+    	{
+    		-blockedByAgent;
+    		
+    		@blockworld( east(), _ );
+    		@blockworld( north(), _ );
+    	}
+    	else
+    	{	
+    		-blockedByStone;
+    		hugStone(STONES, 2, A, B, 1);
+    	}
+    	goto( X, Y );
+    }
+    else if (B < Y) then
+    { 
+		checkNextStepForStone(A,B+1,STONES);
+		checkNextStepForAgent(A,B+1,AGENTS);
+    	if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		
+    		@blockworld( south(), _ );
+    		
+	    	@blockworld( senseTraps(), TRAPS );
+	    	if B( TRAPS = [[default,X1,Y1]|REST] )
+	    	{
+	        	if B(not trap(X1, Y1, R))
+    			{
+		    	 	B(totalTraps(N));
+			      	-totalTraps(N);
+		    		+totalTraps(N+1);
+		      		+trap(X1,Y1, N+1);
+		      	} 
+	    	}
+    	}
+    	else if (B(blockedByAgent))
+    	{
+    		-blockedByAgent;
+    		
+    		@blockworld( west(), _ );
+    		@blockworld( south(), _ );
+    	}
+    	else
+    	{	
+    		-blockedByStone;
+    		hugStone(STONES, 4, A, B, 3);
+    	}
+    	goto( X, Y );
+    }
+  }
+  
+  % function that checks for a stone at a specific position
+  checkNextStepForStone(X,Y,STONES) <- true |
+  {	
+  	if B( STONES = [[default,XSTONE,YSTONE]|REST] )
+    { 	
+    	if(X=XSTONE and Y=YSTONE)
+    	{    			
+    		+blockedByStone;
+    	}
+    	
+      	checkNextStepForStone(X,Y,REST);
+    }
+  }
+  
+   % function that checks for an agent at a specific position
+  checkNextStepForAgent(X,Y,AGENTS) <- true |
+  {	
+  	if B( AGENTS = [[A1,XAGENTS,YAGENTS]|REST] )
+    { 	
+    	if(X=XAGENTS and Y=YAGENTS)
+    	{    			
+    		+blockedByAgent;
+    	}
+    	
+      	checkNextStepForAgent(X,Y,REST);
+    }
+  }
+  
+  checkIfGoalIsOnStone(X,Y,STONES) <- true |
+  {	
+  	if B( STONES = [[default,XSTONE,YSTONE]|REST] )
+    { 	
+    	if(X=XSTONE and Y=YSTONE)
+    	{    			
+    		+goalOnStone;
+    	}
+    	
+      	checkIfGoalIsOnStone(X,Y,REST);
+    }
+  }
+  
+  % function that handles the alternative path an agent should take to avoid obstacles, and still reach its target.
+  % Agent will always have a preference in what direction to turn to, if its way it's blocked
+  % The agent will always try to move to those direction if available. If not, it will try the next one.
+  % This will go on, until the agent is eventually back on its track. This mimics the behavior of sticking on to, and following a wall.
+  hugStone(STONES, DIRECTION, A, B, ORIGINAL) <- true |
+  {
+  	if (DIRECTION = 1)
+  	{
+  		checkNextStepForStone(A,B-1,STONES);
+  		if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		@blockworld( north(), _ );
+    		
+	    	@blockworld( senseTraps(), TRAPS );
+	    	if B( TRAPS = [[default,X1,Y1]|REST] )
+	    	{
+	        	if B(not trap(X1, Y1, R))
+    			{
+		    	 	B(totalTraps(N));
+			      	-totalTraps(N);
+		    		+totalTraps(N+1);
+		      		+trap(X1,Y1, N+1);
+		      	} 
+	    	}
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+      			hugStone(STONES, 4, A, B-1, ORIGINAL);
+      		}
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		if(not DIRECTION = ORIGINAL)
+    		{
+    			hugStone(STONES, 2, A, B, ORIGINAL);
+    		}
+    	}
+  	}
+  	else if (DIRECTION = 2)
+  	{
+  		checkNextStepForStone(A+1,B,STONES);
+  		if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		@blockworld( east(), _ );
+    		
+	    	@blockworld( senseTraps(), TRAPS );
+	    	if B( TRAPS = [[default,X1,Y1]|REST] )
+	    	{
+	        	if B(not trap(X1, Y1, R))
+    			{
+		    	 	B(totalTraps(N));
+			      	-totalTraps(N);
+		    		+totalTraps(N+1);
+		      		+trap(X1,Y1, N+1);
+		      	} 
+	    	}
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+      			hugStone(STONES, 1, A+1, B, ORIGINAL); 
+      		}
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+    			hugStone(STONES, 3, A, B, ORIGINAL);
+    		}
+    	}
+    	
+  	}
+  	else if (DIRECTION = 3)
+  	{
+  		checkNextStepForStone(A,B+1,STONES);
+  		if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		@blockworld( south(), _ );
+    		
+	    	@blockworld( senseTraps(), TRAPS );
+	    	if B( TRAPS = [[default,X1,Y1]|REST] )
+	    	{
+	        	if B(not trap(X1, Y1, R))
+    			{
+		    	 	B(totalTraps(N));
+			      	-totalTraps(N);
+		    		+totalTraps(N+1);
+		      		+trap(X1,Y1, N+1);
+		      	} 
+	    	}
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+      			hugStone(STONES, 2, A, B+1, ORIGINAL);
+      		}
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+    			hugStone(STONES, 4, A, B, ORIGINAL);
+    		}
+    	}
+  	}
+  	else 
+  	{
+  		checkNextStepForStone(A-1,B,STONES);
+  		if(B(not blockedByStone))
+    	{
+    		-blockedByStone;
+    		@blockworld( west(), _ );
+    		
+	    	@blockworld( senseTraps(), TRAPS );
+	    	if B( TRAPS = [[default,X1,Y1]|REST] )
+	    	{
+	        	if B(not trap(X1, Y1, R))
+    			{
+		    	 	B(totalTraps(N));
+			      	-totalTraps(N);
+		    		+totalTraps(N+1);
+		      		+trap(X1,Y1, N+1);
+		      	} 
+	    	}
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+      			hugStone(STONES, 3, A-1, B, ORIGINAL);
+      		}
+    	}
+    	else
+    	{
+    		-blockedByStone;
+    		
+    		if(not DIRECTION = ORIGINAL)
+    		{
+    			hugStone(STONES, 1, A, B, ORIGINAL);
+    		}
+    	}
+  	}
+  }
+
+  message( hally, inform, La, On, bombAt( X, Y ) ) <- true |
+  {   
+    if B( not bomb( A, B ) ) {
+      +bomb(X, Y);
+      adoptz( clean( blockWorld ) );
+    }
+    else { 
+			+bomb( X, Y );
+		}
+  }
+  
+  % Request message received to let Hally know if this agent is available or not.
+  % Replies with available (1) or not (0)
+  message(hally, request, La, On, isAvailable(XBOMB, YBOMB) ) <- true |
+  {  
+  	@blockworld( sensePosition(), POS );
+  	B(POS = [X,Y]);
+  		 
+	if(B(not bomb(X1,Y1)) && B(not carry(bomb)))
+	{
+		send(hally, inform, isAvailable(1,X,Y,XBOMB,YBOMB));
+	}
+	else
+	{
+		send(hally, inform, isAvailable(0,X,Y,XBOMB,YBOMB));
+	}
+  }
+  
+  % function that will find the closest known trap from the agent's current position, in order to throw the bomb
+  findClosestTrap(I, N) <- true |
+  {
+  	@blockworld( sensePosition(), POS );
+  	B(POS = [A,B]);
+  	
+  	if(I > N)
+  	{
+  		+finished;
+  	}
+  	else
+  	{
+  		B(trap(X,Y,I));
+  	
+  		if (I < 2)   %instead of I=1
+  		{
+  			+closestTrap(X, Y);
+  		} 
+  		else 
+  		{
+  			B(closestTrap(K,L));
+  			
+  			+disC((K - A) * (K - A) + (L - B) * (L - B));
+  			+disT((X - A) * (X - A) + (Y - B) * (Y - B));
+  			
+  			B(disC(D1));
+  			B(disT(D2));
+  			
+  			-disC(D1);
+  			-disT(D2);
+  			
+  			if (D2 < D1)
+  			{
+  				-closestTrap(K, L);
+  				
+  				+closestTrap(X, Y);
+  			}
+  		}
+  		
+  		findClosestTrap(I+1, N);
+  	}
+  }
+  
+  
+
+prrules:
+  @blockworld( pickup(), _ ); REST; <- true |
+  {
+    @blockworld( sensePosition(), POS );
+    B(POS = [X,Y]);
+    -bomb(X, Y );
+  }
