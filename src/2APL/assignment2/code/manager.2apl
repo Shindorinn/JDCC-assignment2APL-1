@@ -1,1 +1,158 @@
-include: agent.2apl;
+beliefs:
+	pc(5, 'SuperMicro SC822', 'Intel Desktop Board D865GLC', 'Intel Pentium 4', 'ATI RADEON 7000 Graphics card').
+	pc(4, 'SuperMicro SC822', 'Intel Desktop Board D865GLC', 'Intel Pentium 4', 'ATI RADEON 7000 Graphics card').
+	constructedPCs :- not pc(NUMBER, CASE, MOTHERBOARD, PROCESSOR, GRAPHICS).
+	first.
+	firstmessage.
+	pcid(0).
+	
+
+beliefupdates:
+  { pcid(N), minimummother(N1), minimumprocessor(N2), minimumcase(N3), minimumgraphics(N4), pcnumber(N5) }	Sum()		{ not minimummother(N1), not minimumprocessor(N2), not minimumcase(N3), not minimumgraphics(N4), not pcid(N), pcid(N+1), price(N+1, N5, (N1+N2+N3+N4)*N5) }	
+	
+goals:
+	constructedPCs.
+	
+pgrules:
+  constructedPCs <- true | 
+  {
+	if(B(not broadcastedWantedpc))
+	{
+		broadcastPC();
+	}
+  }
+	
+pcrules:
+	broadcastPC() <- true |
+	{
+		B(pc(NUMBER, CASE, MOTHERBOARD, PROCESSOR, GRAPHICS));
+		
+		if (B(first)) 
+		{
+			-first;
+			send(contractor1, inform, wantedpc(NUMBER, CASE, MOTHERBOARD, PROCESSOR, GRAPHICS));
+		}
+		
+		if (B(second))
+		{
+			-second;
+			send(contractor2, inform, wantedpc(NUMBER, CASE, MOTHERBOARD, PROCESSOR, GRAPHICS));
+			+secondmessage;
+		}
+		
+		if (B(third))
+		{
+			-third;
+			send(contractor3, inform, wantedpc(NUMBER, CASE, MOTHERBOARD, PROCESSOR, GRAPHICS));
+			+thirdmessage;
+		}
+	}
+	
+	message(NAME, inform, La, On, response(COSTCASE, COSTMOTHER, COSTPROCESSOR, COSTGRAPHICS)) <- true |
+	{	
+		calculate(COSTCASE, COSTMOTHER, COSTPROCESSOR, COSTGRAPHICS);
+		
+		if (B(firstmessage)) 
+		{
+			-firstmessage;
+			+second;
+		}
+		
+		if (B(secondmessage))
+		{
+			-secondmessage;
+			+third;
+		}
+		
+		if (B(thirdmessage))
+		{
+			-third;
+			-thirdmessage;
+			+broadcastedWantedpc;
+			
+			B(pc(NUMBER, CASE, MOTHERBOARD, PROCESSOR, GRAPHICS));
+			-pc(NUMBER, CASE, MOTHERBOARD, PROCESSOR, GRAPHICS);
+			
+			+pcnumber(NUMBER);
+			Sum();
+			-pcnumber(NUMBER);
+			
+			if (B(pc(NUMBER1, CASE1, MOTHERBOARD1, PROCESSOR1, GRAPHICS1)))
+			{
+				+first;
+				+firstmessage;
+				-broadcastedWantedpc;	
+			}
+		}
+	}
+	
+
+	calculate(COSTCASE, COSTMOTHER, COSTPROCESSOR, COSTGRAPHICS) <- true |
+	{
+		if (COSTCASE > 0)
+		{
+			if (B(minimumcase(TEMPCASE)))
+			{
+				if (COSTCASE < TEMPCASE)
+				{
+					-minimumcase(TEMPCASE);
+					+minimumcase(COSTCASE);
+				}
+			}
+			else
+			{
+				+minimumcase(COSTCASE);
+			}
+		}
+
+		if (COSTMOTHER > 0)
+		{
+			if (B(minimummother(TEMPMOTHER)))
+			{
+				if (COSTMOTHER < TEMPMOTHER)
+				{
+					-minimummother(TEMPMOTHER);
+					+minimummother(COSTMOTHER);
+				}
+			}
+			else
+			{
+				+minimummother(COSTMOTHER);
+			}
+		}
+		
+		if (COSTGRAPHICS > 0)
+		{			
+			if (B(minimumgraphics(TEMPGRAPHICS)))
+			{
+				if (COSTGRAPHICS < TEMPGRAPHICS)
+				{
+					-minimumgraphics(TEMPGRAPHICS);
+					+minimumgraphics(COSTGRAPHICS);
+				}
+			}
+			else
+			{
+				+minimumgraphics(COSTGRAPHICS);
+			}
+		}
+		
+		if (COSTPROCESSOR > 0)
+		{
+			if (B(minimumprocessor(TEMPPROCESSOR)))
+			{				
+				if (COSTPROCESSOR < TEMPPROCESSOR)
+				{
+					-minimumprocessor(TEMPPROCESSOR);
+					+minimumprocessor(COSTPROCESSOR);
+				}
+			}
+			else
+			{
+				+minimumprocessor(COSTPROCESSOR);
+			}
+		}			
+	}
+	
+	
+	

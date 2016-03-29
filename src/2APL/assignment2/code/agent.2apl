@@ -1,0 +1,32 @@
+/*  ____________________________________________________________________________
+ * |                        Basic 2APL Setup - 2APL Agent                       |
+ * |                                                                            |
+ * |_________by Marc van Zee - marcvanzee@gmail.com, Utrecht University_________|
+ *
+ * This agent is meant to demonstrate the basic functionality of the interaction 
+ * between the Java environment and the 2APL agent. For more information, please
+ * see the environment file Env.java that is contained in the subdirectory "src/".
+ *
+ */
+ 
+ beliefs:
+	pc(5, "SuperMicro SC822", "Intel Desktop Board D865GLC", "Intel Pentium 4", "ATI RADEON 7000 Graphics card").
+	constructedPCs :- not pc(V, W, X, Y, Z).
+	%bomb(5,2).
+	%constructedPCs :- not bomb(X, Y).
+
+goals:
+  constructedPCs.
+
+pgrules:  
+  constructedPCs <- pc(V, W, X, Y, Z) | 
+  {
+     +teeeeeeeeest;
+     
+     -pc(V, W, X, Y, Z);
+  }
+	
+pcrules:
+	event(name(Name), env) <- true | {
+		+name(Name);
+	}
